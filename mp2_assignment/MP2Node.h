@@ -18,22 +18,21 @@
 #include "Params.h"
 #include "Message.h"
 #include "Queue.h"
+const int STABLE = -1;
 
-#define TIMEOUT 10
-
-struct TRANSACTION_INFO
-{
-		MessageType msgType;
-		string key;
-		string value;
-		string value2;
-		bool isCommited;
-		bool isFailed;
-		long time;
-		int replyCount;
-		int failureCount;
+class transaction {
+private:
+	int id;
+	int timestamp;
+public:
+	transaction(int trans_id, int timestamp, MessageType mType, string key, string value);
+	int replyCount;
+	int successCount;
+	string key;
+	string value;
+	MessageType mType;
+	int getTime(){ return timestamp;};
 };
-
 
 /**
  * CLASS NAME: MP2Node
@@ -63,8 +62,10 @@ private:
 	EmulNet * emulNet;
 	// Object of Log
 	Log * log;
-
-	map<long, TRANSACTION_INFO> transInfo;
+	// Transactions
+	map<int, transaction*> transMap;
+	// <trans_id, success> 
+	map<int, bool> transComplete; 
 
 public:
 	MP2Node(Member *memberNode, Params *par, EmulNet *emulNet, Log *log, Address *addressOfMember);
@@ -98,65 +99,24 @@ public:
 	vector<Node> findNodes(string key);
 
 	// server
-	bool createKeyValue(string key, string value, ReplicaType replica);
-	string readKey(string key);
-	bool updateKeyValue(string key, string value, ReplicaType replica);
-	bool deletekey(string key);
+	bool createKeyValue(string key, string value, ReplicaType replica, int transID);
+	string readKey(string key, int transID);
+	bool updateKeyValue(string key, string value, ReplicaType replica, int transID);
+	bool deletekey(string key, int transID);
 
 	// stabilization protocol - handle multiple failures
 	void stabilizationProtocol();
-
-	~MP2Node();
-
-	//my methods
-	void inc_trans_id()
-	{
-		++g_transID;
-	}
-
-	long get_trans_id()
-	{
-		return g_transID;
-	}
-
-	void onCreateMessage(Message&);
-	void onDeleteMessage(Message&);
-	void onReadMessage(Message&);
-	void onUpdateMessage(Message&);
-
-	void onCreateReplyMessage(Message&);
-	void onDeleteReplyMessage(Message&);
-	void onReadReplyMessage(Message&);
-	void onUpdateReplyMessage(Message&);
-
-
-	void updateHasMyReplicas(string key);
-	void updateHaveReplicasOf(string key);
-
-	void storeCreateTransInfo(string key, string value);
-	void storeDeleteTransInfo(string key);
-	void storeReadTransInfo(string key);
-	void storeUpdateTransInfo(string key, string value);
-
-	void timeouts();
-	void removeFailedTransactions();
-	void removeCommittedTransactions();
-
-	void printTransInfo(int tid, const TRANSACTION_INFO& info)
-	{
-		cout << "---- INFO ----"<<endl;
-		cout << "tid: " << tid << endl;
-		cout << "msgType: " << info.msgType << endl;
-		cout << "key: " << info.key << endl;
-		cout << "value: " << info.value << endl;
-		cout << "value2: " << info.value2 << endl;
-		cout << "isCommited: " << info.isCommited << endl;
-		cout << "isFailed: " << info.isFailed << endl;
-		cout << "replyCount: " << info.replyCount << endl;
-		cout << "failureCount: " << info.failureCount << endl;
-		cout << "-----------------------------" << endl;
-	}
 	
+	// My function 
+	Message constructMsg(MessageType mType, string key, string value = "", bool success = false);
+	void createTransaction(int trans_id, MessageType mType, string key, string value);
+	void sendreply(string key, MessageType mType, bool success, Address* fromaddr, int transID, string content = "");
+	void checkTransMap();
+	void logOperation(transaction* t, bool isCoordinator, bool success, int transID);
+
+	// Destructor
+	~MP2Node();
 };
+
 
 #endif /* MP2NODE_H_ */
